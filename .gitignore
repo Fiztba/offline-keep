@@ -1,0 +1,15 @@
+# Only the tool itself is published. Everything else here is local research material:
+# reference/ holds third-party sources (Frosty Toolsuite is CC BY-NC-ND), tools/ holds Frosty binaries,
+# and research/out + output/ contain data extracted from the game, which must never be redistributed.
+/*
+!/.gitignore
+!/LICENSE
+!/README.md
+!/Offline Keep.pyw
+!/offlinekeep/
+!/packaging/
+
+__pycache__/
+*.pyc
+/packaging/build/
+/packaging/dist/
