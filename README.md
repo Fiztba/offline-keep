@@ -28,6 +28,19 @@ choices, and Offline Keep turns them into a Frosty Mod Manager mod that replaces
 
 World states only apply at character creation; they don't change games already in progress.
 
+## Troubleshooting
+
+- **Frosty Mod Manager: "Could not load file or assembly 'Newtonsoft.Json…'"** on startup. Frosty looks for its
+  `ThirdParty` folder relative to the *current working folder*, so it crashes when started from a Start-menu
+  search, a pinned taskbar icon or a shortcut without a "Start in" folder. Start it from File Explorer (right-click
+  `FrostyModManager.exe` → Run as administrator), or set the shortcut's **Start in** to Frosty's own folder.
+- **"Access to the path …\ModData\… is denied"** when launching: the game is under Program Files, so run Frosty Mod
+  Manager as administrator.
+- **Game not found:** Offline Keep checks the EA App/Origin registry entry, all Steam library folders and the Epic
+  Games Launcher; otherwise it asks for the folder that contains `DragonAgeInquisition.exe`.
+- **A save editor doesn't show a value you set:** Offline Keep sets the same world-state variables the Keep did;
+  some save editors only know a fixed list of flag names and values.
+
 ## How it works
 
 The game defines its world state in the EBX asset `da3/configurations/online/bwworldstateconfigasset`:

@@ -1,6 +1,7 @@
 """User settings and world-state files."""
 import json
 import os
+import re
 from pathlib import Path
 
 APP_DIR = Path(os.environ.get("APPDATA", Path.home())) / "OfflineKeep"
@@ -22,24 +23,73 @@ def save_settings(settings):
 
 def detect_game_dir():
     """Find Dragon Age: Inquisition via the registry (EA App/Origin) or common Steam locations."""
-    candidates = []
-    try:
-        import winreg
-        for key in (r"SOFTWARE\WOW6432Node\BioWare\Dragon Age Inquisition", r"SOFTWARE\BioWare\Dragon Age Inquisition"):
-            try:
-                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key) as k:
-                    candidates.append(winreg.QueryValueEx(k, "Install Dir")[0])
-            except OSError:
-                pass
-    except ImportError:
-        pass
+    candidates = _registry_candidates() + _steam_candidates() + _epic_candidates()
     candidates += [r"C:\Program Files\EA Games\Dragon Age Inquisition",
                    r"C:\Program Files (x86)\Origin Games\Dragon Age Inquisition",
-                   r"C:\Program Files (x86)\Steam\steamapps\common\Dragon Age Inquisition"]
+                   r"C:\Program Files (x86)\Steam\steamapps\common\Dragon Age Inquisition",
+                   r"C:\Program Files\Epic Games\DragonAgeInquisition"]
     for c in candidates:
         if is_game_dir(c):
             return str(Path(c))
     return None
+
+
+STEAM_APP_ID = "1222690"
+
+
+def _reg_value(root, key, name):
+    try:
+        import winreg
+        with winreg.OpenKey(root, key) as k:
+            return winreg.QueryValueEx(k, name)[0]
+    except (ImportError, OSError):
+        return None
+
+
+def _registry_candidates():
+    """EA App / Origin write BioWare's key; Steam writes an uninstall entry for its app id."""
+    try:
+        import winreg
+    except ImportError:
+        return []
+    keys = [(r"SOFTWARE\WOW6432Node\BioWare\Dragon Age Inquisition", "Install Dir"),
+            (r"SOFTWARE\BioWare\Dragon Age Inquisition", "Install Dir"),
+            (rf"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App {STEAM_APP_ID}", "InstallLocation"),
+            (rf"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Steam App {STEAM_APP_ID}",
+             "InstallLocation")]
+    return [v for v in (_reg_value(winreg.HKEY_LOCAL_MACHINE, k, n) for k, n in keys) if v]
+
+
+def _steam_candidates():
+    """Every Steam library folder listed in libraryfolders.vdf (covers libraries on other drives)."""
+    try:
+        import winreg
+    except ImportError:
+        return []
+    steam = _reg_value(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam", "SteamPath")
+    if not steam:
+        return []
+    libraries = [steam]
+    try:
+        vdf = (Path(steam) / "steamapps" / "libraryfolders.vdf").read_text(encoding="utf-8", errors="replace")
+        libraries += [p.replace("\\\\", "\\") for p in re.findall(r'"path"\s+"([^"]+)"', vdf)]
+    except OSError:
+        pass
+    return [str(Path(lib) / "steamapps" / "common" / "Dragon Age Inquisition") for lib in libraries]
+
+
+def _epic_candidates():
+    """Epic Games Launcher manifests record each installed game's folder."""
+    manifests = Path(os.environ.get("PROGRAMDATA", r"C:\ProgramData")) / "Epic" / "EpicGamesLauncher" / "Data" / "Manifests"
+    out = []
+    for item in manifests.glob("*.item") if manifests.is_dir() else []:
+        try:
+            data = json.loads(item.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if "inquisition" in str(data.get("DisplayName", "")).lower():
+            out.append(data.get("InstallLocation", ""))
+    return out
 
 
 def is_game_dir(path):

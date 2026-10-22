@@ -357,8 +357,10 @@ class App:
         for n in sorted(k for k in self.values if k.startswith(("dao_", "da2_"))):
             kind = "override" if n in self.overrides else ("question" if n in prim else "derived/other")
             tag = "over" if n in self.overrides else ("changed" if self.values[n] != self.defaults[n] else "")
+            # the generated mod raises the game's limit when a value needs it, so show the effective max
+            effective_max = max(self.ws.vars[n]["MaxValue"], self.values[n])
             tree.insert("", "end", iid=n, text=n, tags=(tag,),
-                        values=(self.values[n], self.defaults[n], self.ws.vars[n]["MaxValue"], kind))
+                        values=(self.values[n], self.defaults[n], effective_max, kind))
         tree.pack(fill="both", expand=True)
         tree.bind("<Double-1>", lambda e: self._edit_override(tree))
         btns = ttk.Frame(f)
