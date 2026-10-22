@@ -62,8 +62,31 @@ SECTIONS = [
 class Question:
     var: str
     text: str
-    options: dict  # value -> label
+    options: dict  # value -> label, one entry per distinct answer (offered in the dropdown)
     game_default: int
+    labels: dict = field(default_factory=dict)  # every value the game describes, duplicates included
+
+    def label_for(self, value):
+        """Display text for a value, marking hidden duplicate values so they stay distinguishable."""
+        if value in self.options:
+            return self.options[value]
+        if value in self.labels:
+            return f"{self.labels[value]} (value {value})"
+        return None
+
+
+# Typos in the game's own Keep text, corrected for display only.
+TEXT_FIXES = {"Cured it with the wilds flower.": "Cured it with the wild flowers."}
+
+
+def _distinct(options):
+    """Keep the lowest value for each answer text (the game lists some answers under several values)."""
+    out, seen = {}, set()
+    for value, label in sorted(options.items()):
+        if label not in seen:
+            seen.add(label)
+            out[value] = label
+    return out
 
 
 @dataclass
@@ -88,8 +111,9 @@ def _game_text(ws):
         for d in descs:
             q, _, answer = d["DisplayString"].lstrip("$").partition("  ")
             question = question or q.strip()
+            answer = TEXT_FIXES.get(answer.strip(), answer.strip())
             for value in d["TriggerValues"]:
-                options[value] = answer.strip()
+                options[value] = answer
         out[name] = (question, dict(sorted(options.items())))
     return out
 
@@ -109,7 +133,7 @@ def build_sections(ws):
                         continue
                     seen.add(n)
                     q, opts = text[n]
-                    sec.questions.append(Question(n, q, opts, ws.vars[n]["DefaultValue"]))
+                    sec.questions.append(Question(n, q, _distinct(opts), ws.vars[n]["DefaultValue"], opts))
             sections.append(sec)
     return sections
 
