@@ -75,6 +75,12 @@ class Question:
         return None
 
 
+# Answers beyond the game's own Keep text. Value 4 for Morrigan's child is documented by community tools
+# (World History Editor, via anshela's Custom World States reference); MaxValue is raised automatically.
+EXTRA_OPTIONS = {
+    "dao_morrigan_baby": {4: "Yes, with the Warden, without the Dark Ritual (no Old God soul)"},
+}
+
 # Typos in the game's own Keep text, corrected for display only.
 TEXT_FIXES = {"Cured it with the wilds flower.": "Cured it with the wild flowers."}
 
@@ -133,6 +139,7 @@ def build_sections(ws):
                         continue
                     seen.add(n)
                     q, opts = text[n]
+                    opts = {**opts, **EXTRA_OPTIONS.get(n, {})}
                     sec.questions.append(Question(n, q, _distinct(opts), ws.vars[n]["DefaultValue"], opts))
             sections.append(sec)
     return sections

@@ -190,6 +190,10 @@ def warnings(v):
         w.append("Morrigan had Alistair's child, but Alistair didn't survive the Landsmeet.")
     if v["dao_morrigan_baby"] == 3 and v["dao_loghain_fate"] in (0, 1):
         w.append("Morrigan had Loghain's child, but Loghain was executed.")
+    if v["dao_morrigan_baby"] in (1, 4) and v["dao_warden_mf"] == 1:
+        w.append("Morrigan had the Warden's child, which requires a male Warden.")
+    if v["dao_morrigan_baby"] == 4 and v["dao_warden_romance"] != 2:
+        w.append("Morrigan had the Warden's child without the Dark Ritual, but the Warden didn't romance her.")
     if v["dao_morrigan_baby"] in (1, 2, 3) and v["dao_warden_state"] == 0:
         w.append("The Dark Ritual was performed, yet the Warden died killing the Archdemon.")
     if v["dao_warden_romance"] == 1 and v["dao_warden_mf"] == 0:
