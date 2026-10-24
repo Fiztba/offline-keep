@@ -47,6 +47,10 @@ SHA-256 against GitHub's published digest, swaps it in place of the running exec
 version. If anything fails (offline, folder not writable…) the current version simply starts, and the reason
 is written to `%APPDATA%\OfflineKeep\update.log`. This is the only time Offline Keep goes online.
 
+For maintainers: the updater follows GitHub's *latest* release, so a release's `OfflineKeep.exe` must report the
+same version as its tag (`offlinekeep/__init__.py`). To pull a bad release, delete it or mark it as a
+pre-release; `latest` skips pre-releases.
+
 ## Troubleshooting
 
 - **Frosty Mod Manager: "Could not load file or assembly 'Newtonsoft.Json…'"** on startup. Frosty looks for its
