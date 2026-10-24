@@ -5,7 +5,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
-from . import __version__, catalog, rules, settings
+from . import __version__, catalog, rules, settings, updater
 from .worldstate import WorldState, game_head, make_fbmod
 
 APP_NAME = "Offline Keep"
@@ -90,9 +90,17 @@ class App:
         f.add_separator()
         f.add_command(label="Exit", command=self.quit)
         m.add_cascade(label="File", menu=f)
+        t = tk.Menu(m, tearoff=False)
+        t.add_command(label="Verify World State…", command=self.open_verify)
+        m.add_cascade(label="Tools", menu=t)
         s = tk.Menu(m, tearoff=False)
         s.add_command(label="Game Folder…", command=self.choose_game_dir)
         s.add_command(label="Frosty Mod Manager Folder…", command=self.choose_frosty_dir)
+        s.add_separator()
+        self.auto_update = tk.BooleanVar(value=bool(self.cfg.get("auto_update", False)))
+        s.add_checkbutton(label="Check for Updates at Startup" + ("" if updater.is_packaged() else " (.exe only)"),
+                          variable=self.auto_update, command=self.toggle_auto_update,
+                          state="normal" if updater.is_packaged() else "disabled")
         m.add_cascade(label="Settings", menu=s)
         h = tk.Menu(m, tearoff=False)
         h.add_command(label="How to Use", command=self.help)
@@ -114,6 +122,8 @@ class App:
         ttk.Button(top, text="Save", command=self.save).pack(side="left")
         self.gen_btn = ttk.Button(top, text="Generate Mod…", command=self.generate, state="disabled")
         self.gen_btn.pack(side="right")
+        self.verify_btn = ttk.Button(top, text="Verify…", command=self.open_verify, state="disabled")
+        self.verify_btn.pack(side="right", padx=6)
 
         body = ttk.PanedWindow(self.root, orient="horizontal")
         body.pack(fill="both", expand=True, padx=10)
@@ -187,7 +197,9 @@ class App:
             self._fill_tree()
             self.new(confirm=False)
             self.gen_btn.configure(state="normal")
-            self.status(f"Game: {game_dir}  (build {self.head})")
+            self.verify_btn.configure(state="normal")
+            note = f"  —  updated from {updater.updated_from()} to {__version__}" if updater.updated_from() else ""
+            self.status(f"Game: {game_dir}  (build {self.head}){note}")
 
         poll()
 
@@ -468,6 +480,18 @@ class App:
         settings.save_settings(self.cfg)
         self.status(f"Generated mods will be offered to {settings.frosty_mods_dir(d)}")
 
+    def toggle_auto_update(self):
+        self.cfg["auto_update"] = bool(self.auto_update.get())
+        settings.save_settings(self.cfg)
+        self.status("Offline Keep will check GitHub for a new version each time it starts."
+                    if self.cfg["auto_update"] else "Automatic updates are off.")
+
+    def open_verify(self):
+        if not self.ws:
+            return
+        from .verifywindow import VerifyWindow
+        VerifyWindow(self)
+
     def help(self):
         messagebox.showinfo(APP_NAME, HELP, parent=self.root)
 
@@ -487,12 +511,15 @@ is saved straight into Frosty's Mods folder.
 
 4. In Frosty Mod Manager: Apply the mod, then Launch the game from Frosty.
 
-5. Start a NEW game and pick the DEFAULT world state. World states only apply at character creation."""
+5. Start a NEW game and pick the DEFAULT world state. World states only apply at character creation.
+
+6. Tools → Verify World State… shows which world state Frosty installed, and which one a save actually uses."""
 
 ABOUT = f"""Offline Keep {__version__} — an offline replacement for the Dragon Age Keep.
 
 Reads the world state definitions directly from your Dragon Age: Inquisition installation; no game data
-is included and nothing is sent online. Mods are written in Frosty Mod Manager's .fbmod format.
+is included. Mods are written in Frosty Mod Manager's .fbmod format. The only network access is the
+optional update check (Settings → Check for Updates at Startup, off by default), which contacts GitHub.
 
 Unofficial fan tool, not affiliated with or endorsed by Electronic Arts or BioWare.
 MIT licensed — https://github.com/Fiztba/offline-keep
@@ -506,6 +533,31 @@ def main():
         ctypes.windll.shcore.SetProcessDpiAwareness(1)
     except (ImportError, AttributeError, OSError):
         pass
+    splash = {}
+
+    def show_progress(tag):
+        """Small borderless window shown only while a new version downloads."""
+        win = tk.Tk()
+        win.overrideredirect(True)
+        label = ttk.Label(win, text=f"Updating Offline Keep to {tag}…", padding=(24, 16))
+        label.pack()
+        win.update_idletasks()
+        win.geometry(f"+{(win.winfo_screenwidth() - win.winfo_width()) // 2}"
+                     f"+{(win.winfo_screenheight() - win.winfo_height()) // 2}")
+        win.update()
+        splash["win"] = win
+
+        def progress(fraction):
+            label.configure(text=f"Updating Offline Keep to {tag}…  {int(fraction * 100)}%")
+            win.update()
+
+        return progress
+
+    started_new = updater.run_if_enabled(show_progress)
+    if "win" in splash:
+        splash["win"].destroy()
+    if started_new:
+        return
     root = tk.Tk()
     App(root)
     root.mainloop()

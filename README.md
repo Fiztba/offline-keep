@@ -28,6 +28,25 @@ choices, and Offline Keep turns them into a Frosty Mod Manager mod that replaces
 
 World states only apply at character creation; they don't change games already in progress.
 
+## Verifying the world state
+
+**Tools → Verify World State…** (or the *Verify…* button) checks two things:
+
+- **Installed mod (Frosty):** reads the game files Frosty Mod Manager installed (`<game>\ModData\<pack>`) and
+  tells you which world state is active: your current one, one of your saved `.dakeep.json` files, or the
+  game's own default (no world state mod). Frosty rebuilds these files when you click *Launch*.
+- **Saved game:** reads the world state stored in a save (`.DAS`). The game copies the world state into your
+  save at character creation, so this is what that playthrough uses. Any answers that differ from your current
+  world state are listed.
+
+## Automatic updates
+
+*Settings → Check for Updates at Startup* (off by default, `.exe` only). When enabled, each launch asks
+GitHub for the latest release; if it's newer, Offline Keep downloads `OfflineKeep.exe`, checks its size and
+SHA-256 against GitHub's published digest, swaps it in place of the running executable and starts the new
+version. If anything fails (offline, folder not writable…) the current version simply starts, and the reason
+is written to `%APPDATA%\OfflineKeep\update.log`. This is the only time Offline Keep goes online.
+
 ## Troubleshooting
 
 - **Frosty Mod Manager: "Could not load file or assembly 'Newtonsoft.Json…'"** on startup. Frosty looks for its
@@ -58,6 +77,9 @@ shipped with the tool.
 | `offlinekeep/fbmod.py` | Frosty `.fbmod` (format 5) writer |
 | `offlinekeep/catalog.py` | Sections and questions, from the game's own Keep text |
 | `offlinekeep/rules.py` | Derived flags and consistency warnings |
+| `offlinekeep/savegame.py` | Reads plot flags (the imported world state) from `.DAS` saves |
+| `offlinekeep/verify.py`, `verifywindow.py` | Verify World State: installed mod and save checks |
+| `offlinekeep/updater.py` | Optional self-update from GitHub releases |
 | `offlinekeep/app.py` | Tkinter desktop app |
 
 ## Building the .exe
