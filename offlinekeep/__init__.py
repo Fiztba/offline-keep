@@ -1,3 +1,3 @@
 """Offline Keep: build Dragon Age: Inquisition default world states without the Dragon Age Keep."""
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"

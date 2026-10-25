@@ -159,15 +159,38 @@ def derive(v):
     v["da2_fenris_enslaved"] = 0 if fen == 0 else (2 if fen == 3 else 1)
     v["da2_fenris_returned_to_master"] = _b(fen == 3)
     v["da2_fenris_still_alive"] = _b(fen in (2, 3, 4))
+    # Isabela: returned_with_book 0 not recruited, 1 no, 2 yes; turned_over 0 not there, 1 no, 2 yes.
+    # The game's own default world state recruits her but leaves both at 0, so fill in consistent answers.
+    if v["da2_hawke_romance"] == 3:
+        v["da2_isabela_joined"] = 1
     if not v["da2_isabela_joined"]:
         v["da2_isabela_returned_with_book"] = 0
-        v["da2_isabela_turned_over"] = 0
+    elif v["da2_isabela_returned_with_book"] == 0:
+        v["da2_isabela_returned_with_book"] = 2
+    if v["da2_isabela_returned_with_book"] != 2:
+        v["da2_isabela_turned_over"] = 0  # she wasn't there to be turned over
+    elif v["da2_isabela_turned_over"] == 0:
+        v["da2_isabela_turned_over"] = 1
     v["da2_bartrand_alive"] = _b(v["da2_varric_bartrand_killed"] == 0)
     v["da2_legacy_hawke_sided_with_larius"] = _b(v["da2_dlc_legacy_played"] and v["da2_legacy_side_chosen"] == 0)
     v["da2_legacy_hawke_sided_with_janeka"] = _b(v["da2_dlc_legacy_played"] and v["da2_legacy_side_chosen"] == 1)
 
     v["dao_or_da2_played"] = _b(v["dao_played"] or v["da2_played"])
     return v
+
+
+class _Recorder(dict):
+    def __setitem__(self, key, value):
+        self.written.add(key)
+        super().__setitem__(key, value)
+
+
+def derived_names(values):
+    """Names of the variables derive() sets (computed rather than asked)."""
+    rec = _Recorder(values)
+    rec.written = set()
+    derive(rec)
+    return rec.written
 
 
 def warnings(v):
@@ -222,8 +245,8 @@ def warnings(v):
         w.append("Hawke romanced Anders, who was then executed (possible, but intentional?).")
     if rom == 2 and v["da2_fenris_alive"] in (0, 1):
         w.append("Hawke romanced Fenris, but he wasn't recruited or died.")
-    if rom == 3 and not v["da2_isabela_joined"]:
-        w.append("Hawke romanced Isabela, but she wasn't recruited.")
+    if rom == 3 and v["da2_isabela_turned_over"] == 2:
+        w.append("Hawke romanced Isabela, then handed her over to the Arishok.")
     if rom == 5 and not v["da2_sebastian_joined"]:
         w.append("Hawke romanced Sebastian, but he wasn't recruited.")
     if not v["dao_played"] and not v["da2_played"]:

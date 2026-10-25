@@ -354,23 +354,31 @@ class App:
         ttk.Label(f, wraplength=760, justify="left", text=(
             "Every Origins and Dragon Age II variable the game reads. Values shown include the ones derived "
             "automatically from your answers. Double-click a row to override it with any number — overrides win "
-            "over everything else, including values the original games couldn't produce. Use with care.")
+            "over everything else, including values the original games couldn't produce. Use with care.\n"
+            "Kind: question = asked in a section; derived = filled in from your answers; not asked = the game has "
+            "no Keep text for it, so it keeps the game's default unless you override it.")
                   ).pack(anchor="w", pady=(4, 8))
         cols = ("value", "default", "max", "kind")
         tree = ttk.Treeview(f, columns=cols, height=26)
         tree.heading("#0", text="Variable")
-        for c, w in zip(cols, (70, 70, 60, 120)):
+        for c, w in zip(cols, (70, 70, 60, 190)):
             tree.heading(c, text=c.capitalize())
-            tree.column(c, width=w, anchor="center")
-        tree.column("#0", width=380)
+            tree.column(c, width=int(w * self.px), anchor="center")
+        tree.column("#0", width=int(380 * self.px))
         tree.tag_configure("over", foreground="#b00020")
         tree.tag_configure("changed", foreground="#1a5fb4")
-        prim = catalog.primary_vars(self.sections)
+        questions = {q.var: q for s in self.sections for q in s.questions}
+        derived = rules.derived_names(dict(self.defaults)) - questions.keys()
         for n in sorted(k for k in self.values if k.startswith(("dao_", "da2_"))):
-            kind = "override" if n in self.overrides else ("question" if n in prim else "derived/other")
+            if n in self.overrides:
+                kind = "override"
+            else:
+                kind = "question" if n in questions else ("derived" if n in derived else "not asked — game default")
             tag = "over" if n in self.overrides else ("changed" if self.values[n] != self.defaults[n] else "")
-            # the generated mod raises the game's limit when a value needs it, so show the effective max
-            effective_max = max(self.ws.vars[n]["MaxValue"], self.values[n])
+            # the generated mod raises the game's limit when a value needs it, so show the effective max:
+            # the highest answer a question offers, or the current value if an override goes beyond it
+            q = questions.get(n)
+            effective_max = max(self.ws.vars[n]["MaxValue"], self.values[n], max(q.labels, default=0) if q else 0)
             tree.insert("", "end", iid=n, text=n, tags=(tag,),
                         values=(self.values[n], self.defaults[n], effective_max, kind))
         tree.pack(fill="both", expand=True)
