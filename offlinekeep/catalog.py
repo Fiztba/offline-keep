@@ -18,6 +18,10 @@ CUSTOM = {
     "da2_merrill_alive": ("What happened to Merrill?", {0: "Merrill died", 1: "Merrill is alive and well"}),
     "da2_merrils_clan": ("Was Merrill's clan destroyed?", {0: "No", 1: "Yes"}),
     "da2_anders_fate": ("What happened to Anders?", {0: "He is alive and well", 1: "He was executed by Hawke"}),
+    # The game's Keep text describes 0 not there / 1 No / 2 Yes, but Inquisition stores this as a yes/no flag
+    # (MaxValue 1) and its dialogue checks it as a boolean: Varric's Skyhold line about Isabela needs it false.
+    "da2_isabela_turned_over": ("Did Hawke give Isabela to the Arishok?",
+                                {0: "No (or Isabela wasn't there to be turned over)", 1: "Yes"}),
 }
 
 SECTIONS = [

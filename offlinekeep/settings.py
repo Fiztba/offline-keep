@@ -102,9 +102,19 @@ def frosty_mods_dir(frosty_dir):
 
 
 def save_worldstate(path, name, choices, overrides):
-    data = {"format": WORLDSTATE_FORMAT, "version": 1, "name": name,
+    from . import __version__
+    data = {"format": WORLDSTATE_FORMAT, "version": 1, "app_version": __version__, "name": name,
             "choices": dict(sorted(choices.items())), "overrides": dict(sorted(overrides.items()))}
     Path(path).write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def _migrate_choices(choices, app_version):
+    """Adapt answers saved by older versions whose value meanings have since changed."""
+    if app_version is None:  # saved by 1.1.1 or earlier
+        # da2_isabela_turned_over followed the Keep text (1 = No, 2 = Yes); the game reads it as yes/no.
+        if "da2_isabela_turned_over" in choices:
+            choices["da2_isabela_turned_over"] = {1: 0, 2: 1}.get(choices["da2_isabela_turned_over"], 0)
+    return choices
 
 
 def load_worldstate(path):
@@ -112,4 +122,5 @@ def load_worldstate(path):
     if data.get("format") != WORLDSTATE_FORMAT:
         raise ValueError("Not an Offline Keep world state file.")
     to_int = lambda d: {str(k): int(v) for k, v in d.items()}
-    return data.get("name", Path(path).stem), to_int(data.get("choices", {})), to_int(data.get("overrides", {}))
+    choices = _migrate_choices(to_int(data.get("choices", {})), data.get("app_version"))
+    return data.get("name", Path(path).stem), choices, to_int(data.get("overrides", {}))
