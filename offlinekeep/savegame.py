@@ -48,6 +48,86 @@ def read_plot_flags(path):
     return flags
 
 
+def _parse_lists(b, p):
+    """The three plot lists starting at byte p: ([true guids], [false guids], [(guid, value)], end offset)."""
+    lists = []
+    for stride in (16, 16, 20):
+        count = struct.unpack_from(">H", b, p)[0]
+        p += 2
+        if p + count * stride > len(b):
+            raise ValueError("Plot data in this save is truncated or in an unexpected format.")
+        if stride == 16:
+            lists.append([b[p + i * 16:p + i * 16 + 16] for i in range(count)])
+        else:
+            lists.append([(b[p + i * 20:p + i * 20 + 16], struct.unpack_from(">I", b, p + i * 20 + 16)[0])
+                          for i in range(count)])
+        p += count * stride
+    return lists[0], lists[1], lists[2], p
+
+
+def _serialize_lists(true_flags, false_flags, int_flags):
+    out = bytearray()
+    for items in (sorted(true_flags), sorted(false_flags)):
+        out += struct.pack(">H", len(items)) + b"".join(items)
+    out += struct.pack(">H", len(int_flags))
+    for guid, value in sorted(int_flags):
+        out += guid + struct.pack(">I", value)
+    return bytes(out)
+
+
+def write_world_state(src, dest, values, worldstate):
+    """Write a copy of save `src` to `dest` with world-state variables set to `values` (name -> int).
+
+    Yes/no flags move between the true and false lists, so the plot block keeps its exact size and nothing
+    else in the save moves. Returns {name: (old, new)} for the variables that changed.
+    """
+    original = Path(src).read_bytes()
+    n = int.from_bytes(original, "big")
+    total_bits = 8 * len(original)
+    mask = (1 << total_bits) - 1
+    for shift in range(8):
+        b = original if shift == 0 else ((n << shift) & mask).to_bytes(len(original), "big")
+        pos = b.find(MARKER)
+        if pos >= 0:
+            break
+    else:
+        raise ValueError("No plot data found; this doesn't look like a Dragon Age: Inquisition save.")
+    start = pos + len(MARKER)
+    true_flags, false_flags, int_flags, end = _parse_lists(b, start)
+    true_set, false_set = set(true_flags), set(false_flags)
+    ints = dict(int_flags)
+
+    changed = {}
+    for name, value in values.items():
+        g = uuid.UUID(worldstate.vars[name]["PlotFlag"]["PlotFlagId"]["Guid"]).bytes_le
+        if g in ints:
+            if ints[g] != value:
+                changed[name] = (ints[g], value)
+                ints[g] = value
+        elif g in true_set or g in false_set:
+            old = 1 if g in true_set else 0
+            new = 1 if value else 0
+            if old != new:
+                changed[name] = (old, new)
+                (true_set if new else false_set).add(g)
+                (false_set if new else true_set).discard(g)
+        # flags the save doesn't contain are left alone: adding entries would change the save's size
+
+    block = _serialize_lists(true_set, false_set, list(ints.items()))
+    if len(block) != end - start:
+        raise AssertionError("plot block size changed")
+    # put the new block back at the original bit position: shifted byte i holds original bits 8i+shift..
+    q0, q1 = 8 * start + shift, 8 * end + shift
+    width = q1 - q0
+    field_shift = total_bits - q1
+    n = (n & ~(((1 << width) - 1) << field_shift)) | (int.from_bytes(block, "big") << field_shift)
+    out = n.to_bytes(len(original), "big")
+    if len(out) != len(original):
+        raise AssertionError("save size changed")
+    Path(dest).write_bytes(out)
+    return changed
+
+
 def read_world_state(path, worldstate):
     """Variable name -> value for the world-state variables found in the save (missing ones omitted)."""
     flags = read_plot_flags(path)
