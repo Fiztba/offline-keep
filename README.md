@@ -39,6 +39,15 @@ World states only apply at character creation; they don't change games already i
   save at character creation, so this is what that playthrough uses. Any answers that differ from your current
   world state are listed.
 
+### Changing the world state of an existing save
+
+On the *Saved game* tab, **Apply my world state to this save…** rewrites the Origins/DA II world state stored in
+that save, so you don't need a new game. Close the game first. Offline Keep backs the save up to an
+`OfflineKeep backups` folder next to your saves, writes a temporary copy, reads it back to confirm every value,
+and only then replaces the save. Only the world-state flags change; nothing from your Inquisition playthrough is
+touched. Anything the game checks from then on (dialogue, companions, endings) uses the new values, but scenes
+you've already played won't change.
+
 ## Automatic updates
 
 *Settings → Check for Updates at Startup* (off by default, `.exe` only). When enabled, each launch asks

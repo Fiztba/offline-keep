@@ -35,6 +35,10 @@ class VerifyWindow:
         self.save_box.pack(side="left", padx=6)
         self.save_box.bind("<<ComboboxSelected>>", lambda e: self.check_save())
         ttk.Button(row, text="Browse…", command=self.browse_save).pack(side="left")
+        self.apply_btn = ttk.Button(row, text="Apply my world state to this save…", command=self.apply_to_save,
+                                    state="disabled")
+        self.apply_btn.pack(side="right")
+        self.save_values = None
         ttk.Button(self.inst["frame"], text="Check again", command=self.check_installed).pack(
             anchor="w", pady=(0, 6), before=self.inst["result"])
         self.saves = []
@@ -178,5 +182,49 @@ class VerifyWindow:
             return
         path, mtime = self.saves[i]
         heading = f"Save {path.name}, saved {_when(mtime)}."
-        self._run(self.save, lambda: verify.saved_game(path, self.app.ws),
-                  lambda values: self._describe(self.save, values, heading))
+        self.apply_btn.configure(state="disabled")
+        self.save_values = None
+
+        def done(values):
+            self.save_values = values
+            self._describe(self.save, values, heading)
+            differs = any(values.get(n) != v for n, v in verify.world_vars(self.app.values).items() if n in values)
+            self.apply_btn.configure(state="normal" if differs else "disabled")
+
+        self._run(self.save, lambda: verify.saved_game(path, self.app.ws), done)
+
+    def apply_to_save(self):
+        from tkinter import messagebox
+        from .app import pronouns
+        i = self.save_box.current()
+        if i < 0 or self.save_values is None:
+            return
+        path, _ = self.saves[i]
+        target = verify.world_vars(self.app.values)
+        rows, other = verify.differences(target, self.save_values, self.app.sections)
+        female = target.get("dao_warden_mf") == 1
+        lines = [f"• {pronouns(q.text, female)} {pronouns(q.label_for(new) or str(new), female)}"
+                 for _, q, _, new in rows[:12]]
+        if len(rows) > 12:
+            lines.append(f"• …and {len(rows) - 12} more")
+        if other:
+            lines.append(f"• plus {other} other variable(s) that follow from your answers")
+        if not messagebox.askokcancel(
+                "Apply world state to save",
+                f"Change the world state stored in {path.name} to your current world state?\n\n"
+                + "\n".join(lines) +
+                "\n\nClose Dragon Age: Inquisition first. The original save is backed up to the "
+                "\"OfflineKeep backups\" folder next to your saves.\n\n"
+                "This changes what the game checks from now on (dialogue, companions, endings). Scenes you've "
+                "already played won't change.", parent=self.win):
+            return
+        try:
+            changed, backup = savegame.apply_world_state(path, target, self.app.ws)
+        except Exception as ex:
+            messagebox.showerror("Apply world state to save", f"The save was not changed:\n\n{ex}", parent=self.win)
+            return
+        messagebox.showinfo("Apply world state to save",
+                            f"Updated {len(changed)} world-state flag(s) in {path.name}.\n\nBackup: {backup}"
+                            if changed else "The save already matches your world state.", parent=self.win)
+        self.saves[i] = (path, path.stat().st_mtime)
+        self.check_save()

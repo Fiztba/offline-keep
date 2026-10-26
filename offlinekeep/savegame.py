@@ -128,6 +128,36 @@ def write_world_state(src, dest, values, worldstate):
     return changed
 
 
+def apply_world_state(path, values, worldstate):
+    """Safely replace save `path` with a copy that has the given world-state values.
+
+    The original is copied to an "OfflineKeep backups" folder next to the save first, the new version is
+    written to a temporary file and read back to confirm every value, and only then moves into place.
+    Returns (changes {name: (old, new)}, backup path or None if nothing changed).
+    """
+    import shutil
+    import time
+    path = Path(path)
+    tmp = path.with_name(path.name + ".offlinekeep-tmp")
+    try:
+        changed = write_world_state(path, tmp, values, worldstate)
+        if not changed:
+            return {}, None
+        written = read_world_state(tmp, worldstate)
+        wrong = [n for n, (_, new) in changed.items() if written.get(n) != new]
+        if wrong:
+            raise IOError(f"verification failed for: {', '.join(wrong)}")
+        backups = path.parent / "OfflineKeep backups"
+        backups.mkdir(exist_ok=True)
+        backup = backups / f"{path.stem}.{time.strftime('%Y%m%d-%H%M%S')}{path.suffix}"
+        shutil.copy2(path, backup)
+        os.replace(tmp, path)
+        return changed, backup
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+
+
 def read_world_state(path, worldstate):
     """Variable name -> value for the world-state variables found in the save (missing ones omitted)."""
     flags = read_plot_flags(path)
